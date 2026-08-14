@@ -2,6 +2,21 @@
 
 # Sketch to Motion
 
+## Colorful Version Demo
+
+| Input image | Colorful drawing animation |
+|:---:|:---:|
+| <img src="asset/demo_input.png" width="420"> | <img src="asset/demo_color.gif" width="420"> |
+
+Generate it with the color pipeline:
+
+```bash
+python sketch2svg_color.py input.png 16
+manim -qh --disable_caching --output_file output svg2mp4_color.py DrawSVGColor input_color.svg 5.0 0.05 3.55 smooth
+```
+
+The color pipeline (`sketch2svg_color.py` + `svg2mp4_color.py`) quantizes the image into up to 16 colors, traces each color layer separately with potrace, detects the background color automatically, and renders a colored drawing animation with Manim.
+
 Convert a static image into a smooth drawing animation using [Manim](https://www.manim.community/).
 
 This project takes a doodle, photo, or sketch, converts it into an SVG vector graphic, and renders it into an animated MP4 video with Manim.  
