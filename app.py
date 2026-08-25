@@ -2,6 +2,7 @@ import os
 import sys
 import asyncio
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 from typing import Optional
 
@@ -51,6 +52,36 @@ def _run(
         raise RuntimeError(f"Command failed: {' '.join(cmd)}\nExit code: {e.returncode}") from e
 
 
+def _video_frame_rate(video_path: Path) -> Fraction:
+    """Return the video's average frame rate as an FFmpeg-compatible fraction."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=avg_frame_rate",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(video_path),
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        frame_rate = Fraction(result.stdout.strip())
+    except (subprocess.CalledProcessError, ValueError, ZeroDivisionError) as e:
+        raise RuntimeError(f"Could not determine frame rate for {video_path}") from e
+
+    if frame_rate <= 0:
+        raise RuntimeError(f"Video has no usable frame rate: {video_path}")
+    return frame_rate
+
+
 # ----- Video processing -----
 def prepend_last_frame(input_video: str, output_video: str, freeze_sec: float = 1.0) -> None:
     """
@@ -61,53 +92,46 @@ def prepend_last_frame(input_video: str, output_video: str, freeze_sec: float = 
         freeze_sec: duration (seconds) of the prepended still segment.
     """
     _check_cmd_available("ffmpeg", "-version")
+    _check_cmd_available("ffprobe", "-version")
 
     in_path = Path(input_video)
     out_path = Path(output_video)
     base = in_path.with_suffix("")
+    frame_rate = _video_frame_rate(in_path)
+    frame_rate_arg = str(frame_rate)
 
     last_frame_img = base.parent / f"{base.name}_last_frame.png"
-    last_frame_video = base.parent / f"{base.name}_last_frame.mp4"
-    temp1_ts = base.parent / f"{base.name}_temp1.ts"
-    temp2_ts = base.parent / f"{base.name}_temp2.ts"
 
     try:
-        # Extract last frame to an image
+        # Reverse a short tail so the first output frame is the actual final frame.
+        tail_sec = max(0.1, 2 / float(frame_rate))
         _run([
-            "ffmpeg", "-y", "-sseof", "-1", "-i", str(in_path),
-            "-vframes", "1", str(last_frame_img)
+            "ffmpeg", "-y", "-sseof", f"-{tail_sec:.6f}", "-i", str(in_path),
+            "-vf", "reverse", "-vframes", "1", "-update", "1", str(last_frame_img)
         ])
 
-        # Create a short video from the last frame; ensure even dimensions
+        # Render both segments at the source frame rate. Stream-copying a default
+        # 25 fps still with a 60 fps Manim video produces invalid timing metadata.
         _run([
-            "ffmpeg", "-y", "-loop", "1", "-i", str(last_frame_img),
-            "-t", f"{freeze_sec}",
+            "ffmpeg", "-y",
+            "-loop", "1", "-framerate", frame_rate_arg,
+            "-t", f"{freeze_sec}", "-i", str(last_frame_img),
+            "-i", str(in_path),
+            "-filter_complex",
+            (
+                "[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,"
+                "setpts=PTS-STARTPTS[still];"
+                "[1:v]scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,"
+                "setpts=PTS-STARTPTS[source];"
+                "[still][source]concat=n=2:v=1:a=0[video]"
+            ),
+            "-map", "[video]", "-r", frame_rate_arg,
             "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-            str(last_frame_video)
-        ])
-
-        # Convert both clips to MPEG-TS for safe concatenation
-        _run([
-            "ffmpeg", "-y", "-i", str(last_frame_video),
-            "-c", "copy", "-bsf:v", "h264_mp4toannexb",
-            "-f", "mpegts", str(temp1_ts)
-        ])
-
-        _run([
-            "ffmpeg", "-y", "-i", str(in_path),
-            "-c", "copy", "-bsf:v", "h264_mp4toannexb",
-            "-f", "mpegts", str(temp2_ts)
-        ])
-
-        # Concatenate TS streams and remux to MP4
-        _run([
-            "ffmpeg", "-y", "-i", f"concat:{temp1_ts}|{temp2_ts}",
-            "-c", "copy", "-bsf:a", "aac_adtstoasc", str(out_path)
+            "-movflags", "+faststart", str(out_path)
         ])
     finally:
         # Best-effort cleanup for temporary artifacts
-        for f in (last_frame_img, last_frame_video, temp1_ts, temp2_ts):
+        for f in (last_frame_img,):
             try:
                 if f.exists():
                     f.unlink()
