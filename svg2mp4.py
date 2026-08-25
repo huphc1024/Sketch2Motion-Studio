@@ -1,3 +1,5 @@
+import os
+
 from manim import LaggedStart, SVGMobject, FullScreenRectangle
 from manim import Scene, config, WHITE, BLACK, ORIGIN
 from manim import linear, smooth, there_and_back, wiggle
@@ -17,6 +19,21 @@ draw_dict = {
     "wiggle": wiggle}
 
 config.background_color = BLACK  # we’ll cover it anyway
+
+
+def _configure_frame_aspect() -> None:
+    """Match Manim's logical frame to the requested output pixel aspect ratio."""
+    try:
+        width = float(os.environ.get("SKETCH2MOTION_WIDTH", config.pixel_width))
+        height = float(os.environ.get("SKETCH2MOTION_HEIGHT", config.pixel_height))
+        if width > 0 and height > 0:
+            config.frame_height = 8.0
+            config.frame_width = config.frame_height * width / height
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass
+
+
+_configure_frame_aspect()
 
 class DrawSVG(Scene):
     def construct(self):
@@ -51,5 +68,4 @@ class DrawSVG(Scene):
         self.wait(1)
 
 # manim -pql svg2mp4.py DrawSVG
-
 

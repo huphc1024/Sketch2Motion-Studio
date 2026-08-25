@@ -32,6 +32,7 @@ It also prepends the last frame to the start of the video, creating a short paus
   - **Subpath delay ratio** (fractional delay between subpaths)
   - **Scale factor** (zoom in/out)
   - **Drawing style** (`linear`, `smooth`, `there_and_back`, `wiggle`)
+  - **Video format**: landscape 16:9 (`1920x1080`) or portrait 9:16 (`1080x1920`)
 - High-quality vector rendering powered by Manim
 - Optional color-preserving SVG and video generation
 - Automatic last-frame prepend for a smooth intro
@@ -98,5 +99,5 @@ http://127.0.0.1:7880
 1. Upload a doodle/photo as the **Input image**. Enable **Preserve colors** to use the color pipeline and choose its palette size.
 2. Click **Generate sketch** to convert it to SVG.
 3. Adjust **Animation duration**, **Subpath delay ratio**, **Scale factor**, and **Drawing style**.
-4. Click **Generate video** to render and preview the animation.
+4. Choose the **Video format** (landscape is selected by default), then click **Generate video** to render and preview the animation.
 5. Download the generated MP4.

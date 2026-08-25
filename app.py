@@ -11,6 +11,16 @@ from sketch2svg import sketch2svg  # must return (sketch_preview_path, svg_path)
 from sketch2svg_color import sketch2svg_color
 
 
+# ----- Video format options -----
+LANDSCAPE_FORMAT = "Landscape 16:9 (1920x1080)"
+PORTRAIT_FORMAT = "Portrait 9:16 (1080x1920)"
+VIDEO_FORMATS = {
+    LANDSCAPE_FORMAT: (1920, 1080),
+    PORTRAIT_FORMAT: (1080, 1920),
+}
+DEFAULT_VIDEO_FORMAT = LANDSCAPE_FORMAT
+
+
 # ----- Async/subprocess compatibility on Windows -----
 if sys.platform == "win32":
     # Use selector loop for asyncio + subprocess compatibility on Windows
@@ -82,6 +92,17 @@ def _video_frame_rate(video_path: Path) -> Fraction:
     return frame_rate
 
 
+def _video_resolution(video_format: str) -> tuple[int, int]:
+    """Resolve a UI format label to the width and height passed to Manim."""
+    try:
+        return VIDEO_FORMATS[video_format]
+    except (KeyError, TypeError) as e:
+        valid_formats = ", ".join(VIDEO_FORMATS)
+        raise ValueError(
+            f"Unsupported video format {video_format!r}; choose one of: {valid_formats}"
+        ) from e
+
+
 # ----- Video processing -----
 def prepend_last_frame(input_video: str, output_video: str, freeze_sec: float = 1.0) -> None:
     """
@@ -146,15 +167,18 @@ def convert_svg_to_mp4(
     manim_scale: float = 2.0,
     manim_draw: str = "smooth",
     color_mode: bool = False,
+    video_format: str = DEFAULT_VIDEO_FORMAT,
 ) -> Optional[str]:
     """
     Render an SVG into an animated MP4 using Manim, then prepend the last frame for a short still.
-    Returns the final video path, or None on failure.
+    ``video_format`` selects the output pixel dimensions. Returns the final video path, or None
+    on failure.
     """
     if not svg_path:
         print("No SVG path provided.", file=sys.stderr)
         return None
 
+    video_width, video_height = _video_resolution(video_format)
     _check_manim_available()
     _check_cmd_available("ffmpeg", "-version")
 
@@ -166,11 +190,16 @@ def convert_svg_to_mp4(
     media_dir = Path("media")
     manim_scene_file = Path(__file__).with_name("svg2mp4.py")
     scene_class = "DrawSVG"
-    render_env = None
+    render_env = os.environ.copy()
+    render_env.update(
+        {
+            "SKETCH2MOTION_WIDTH": str(video_width),
+            "SKETCH2MOTION_HEIGHT": str(video_height),
+        }
+    )
     if color_mode:
         manim_scene_file = Path(__file__).with_name("svg2mp4_color.py")
         scene_class = "DrawSVGColor"
-        render_env = os.environ.copy()
         render_env.update(
             {
                 "SKETCH2MOTION_SVG": str(svg_p),
@@ -190,6 +219,7 @@ def convert_svg_to_mp4(
         "--disable_caching",
         "--media_dir", str(media_dir),
         "--output_file", filename,
+        "--resolution", f"{video_width},{video_height}",
         str(manim_scene_file),
         scene_class,
     ]
@@ -207,15 +237,13 @@ def convert_svg_to_mp4(
     try:
         _run(cmd, env=render_env)
 
-        # Locate rendered video (Manim output layout may vary across versions)
-        video_path = media_dir / "videos" / manim_scene_file.stem / "1080p60" / f"{filename}.mp4"
-        if not video_path.exists():
-            candidates = list((media_dir / "videos").rglob(f"{filename}.mp4"))
-            if candidates:
-                video_path = candidates[0]
-            else:
-                print("Rendered video not found under media/videos/*", file=sys.stderr)
-                return None
+        # Locate the video created by this render. The resolution directory changes
+        # with the selected format, and an older landscape file may have the same name.
+        candidates = list((media_dir / "videos").rglob(f"{filename}.mp4"))
+        if not candidates:
+            print("Rendered video not found under media/videos/*", file=sys.stderr)
+            return None
+        video_path = max(candidates, key=lambda candidate: candidate.stat().st_mtime)
 
         out_path = video_path.with_name(f"{video_path.stem}-final.mp4")
         prepend_last_frame(str(video_path), str(out_path), freeze_sec=1.0)
@@ -264,6 +292,12 @@ with gr.Blocks(title="Sketch to Motion") as demo:
                 label="Color palette size",
                 interactive=True,
             )
+            video_format = gr.Dropdown(
+                choices=list(VIDEO_FORMATS),
+                value=DEFAULT_VIDEO_FORMAT,
+                label="Video format",
+                interactive=True,
+            )
 
     with gr.Row():
         input_img = gr.Image(label="Input doodle/photo", type="filepath")
@@ -292,7 +326,15 @@ with gr.Blocks(title="Sketch to Motion") as demo:
         outputs=[sketch_preview, svg_path_state, color_mode_state],
     )
 
-    def _guard_convert(svg_path, preserve_colors, dur, delay, scale, drawtype):
+    def _guard_convert(
+        svg_path,
+        preserve_colors,
+        dur,
+        delay,
+        scale,
+        drawtype,
+        output_format=DEFAULT_VIDEO_FORMAT,
+    ):
         """Guard against empty SVG path before conversion."""
         if not svg_path:
             return None
@@ -303,6 +345,7 @@ with gr.Blocks(title="Sketch to Motion") as demo:
             scale,
             drawtype,
             preserve_colors,
+            output_format,
         )
 
     btn_video.click(
@@ -314,6 +357,7 @@ with gr.Blocks(title="Sketch to Motion") as demo:
             manim_delay,
             manim_scale,
             manim_drawtype,
+            video_format,
         ],
         outputs=video_preview
     )

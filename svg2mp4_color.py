@@ -81,6 +81,21 @@ draw_dict = {
 config.background_color = BLACK
 
 
+def _configure_frame_aspect() -> None:
+    """Match Manim's logical frame to the requested output pixel aspect ratio."""
+    try:
+        width = float(os.environ.get("SKETCH2MOTION_WIDTH", config.pixel_width))
+        height = float(os.environ.get("SKETCH2MOTION_HEIGHT", config.pixel_height))
+        if width > 0 and height > 0:
+            config.frame_height = 8.0
+            config.frame_width = config.frame_height * width / height
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass
+
+
+_configure_frame_aspect()
+
+
 class DrawSVGColor(Scene):
     def construct(self):
         self.add(
