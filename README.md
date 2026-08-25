@@ -2,6 +2,21 @@
 
 # Sketch to Motion
 
+## Colorful Version Demo
+
+| Input image | Colorful drawing animation |
+|:---:|:---:|
+| <img src="asset/demo_input.png" width="420"> | <img src="asset/demo_color.gif" width="420"> |
+
+Generate it with the color pipeline:
+
+```bash
+python sketch2svg_color.py input.png 16
+python render_color.py input_color.svg --duration 5.0 --delay 0.05 --scale 3.55 --output-file output
+```
+
+The color pipeline quantizes the image into up to 16 colors, traces each color layer separately with potrace, and renders a colored drawing animation with Manim. Generated SVGs include their own background color, so they can be moved or shared without a companion file.
+
 Convert a static image into a smooth drawing animation using [Manim](https://www.manim.community/).
 
 This project takes a doodle, photo, or sketch, converts it into an SVG vector graphic, and renders it into an animated MP4 video with Manim.  
@@ -18,6 +33,7 @@ It also prepends the last frame to the start of the video, creating a short paus
   - **Scale factor** (zoom in/out)
   - **Drawing style** (`linear`, `smooth`, `there_and_back`, `wiggle`)
 - High-quality vector rendering powered by Manim
+- Optional color-preserving SVG and video generation
 - Automatic last-frame prepend for a smooth intro
 - Simple [Gradio](https://www.gradio.app/) web interface
 
@@ -44,6 +60,7 @@ Key dependencies:
 * [Gradio](https://www.gradio.app/)
 * [Manim](https://docs.manim.community/)
 * [ffmpeg](https://ffmpeg.org/) (must be installed and in your PATH)
+* [Potrace](https://potrace.sourceforge.net/) (must be installed and in your PATH)
 
 Install Manim:
 
@@ -54,6 +71,11 @@ Install ffmpeg:
 * **Windows**: [Download from official site](https://ffmpeg.org/download.html) and add `bin` folder to PATH
 * **macOS**: `brew install ffmpeg`
 * **Linux**: `sudo apt install ffmpeg` or use your package manager
+
+Install Potrace:
+
+* **macOS**: `brew install potrace`
+* **Linux**: `sudo apt install potrace` or use your package manager
 
 ---
 
@@ -73,9 +95,8 @@ http://127.0.0.1:7880
 
 ### 3. Web interface workflow
 
-1. Upload a doodle/photo as the **Input image**.
+1. Upload a doodle/photo as the **Input image**. Enable **Preserve colors** to use the color pipeline and choose its palette size.
 2. Click **Generate sketch** to convert it to SVG.
 3. Adjust **Animation duration**, **Subpath delay ratio**, **Scale factor**, and **Drawing style**.
 4. Click **Generate video** to render and preview the animation.
 5. Download the generated MP4.
-
