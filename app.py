@@ -7,6 +7,7 @@ from typing import Optional
 
 import gradio as gr
 from sketch2svg import sketch2svg  # must return (sketch_preview_path, svg_path)
+from sketch2svg_color import sketch2svg_color
 
 
 # ----- Async/subprocess compatibility on Windows -----
@@ -22,13 +23,30 @@ def _check_cmd_available(cmd: str, ver:str) -> None:
         subprocess.run([cmd, f"{ver}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     except Exception as e:
         raise RuntimeError(f"Required command not available: {cmd!r}. Error: {e}") from e
-    
 
 
-def _run(cmd: list[str], cwd: Optional[Path] = None) -> None:
+def _check_manim_available() -> None:
+    """Ensure Manim is installed in the Python environment running the app."""
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "manim", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except Exception as e:
+        raise RuntimeError(f"Manim is not available: {e}") from e
+
+
+
+def _run(
+    cmd: list[str],
+    cwd: Optional[Path] = None,
+    env: Optional[dict[str, str]] = None,
+) -> None:
     """Run a subprocess command with unified error handling."""
     try:
-        subprocess.run(cmd, check=True, cwd=str(cwd) if cwd else None)
+        subprocess.run(cmd, check=True, cwd=str(cwd) if cwd else None, env=env)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Command failed: {' '.join(cmd)}\nExit code: {e.returncode}") from e
 
@@ -102,7 +120,8 @@ def convert_svg_to_mp4(
     manim_dur: float = 10.0,
     manim_delay: float = 0.1,
     manim_scale: float = 2.0,
-    manim_draw: str = "smooth"
+    manim_draw: str = "smooth",
+    color_mode: bool = False,
 ) -> Optional[str]:
     """
     Render an SVG into an animated MP4 using Manim, then prepend the last frame for a short still.
@@ -112,7 +131,7 @@ def convert_svg_to_mp4(
         print("No SVG path provided.", file=sys.stderr)
         return None
 
-    _check_cmd_available("manim", "--version")
+    _check_manim_available()
     _check_cmd_available("ffmpeg", "-version")
 
     svg_p = Path(svg_path)
@@ -121,11 +140,27 @@ def convert_svg_to_mp4(
         return None
 
     media_dir = Path("media")
-    manim_scene_file = Path("svg2mp4.py")  # must exist locally
-    scene_class = "DrawSVG"                # must exist inside svg2mp4.py
+    manim_scene_file = Path(__file__).with_name("svg2mp4.py")
+    scene_class = "DrawSVG"
+    render_env = None
+    if color_mode:
+        manim_scene_file = Path(__file__).with_name("svg2mp4_color.py")
+        scene_class = "DrawSVGColor"
+        render_env = os.environ.copy()
+        render_env.update(
+            {
+                "SKETCH2MOTION_SVG": str(svg_p),
+                "SKETCH2MOTION_DURATION": str(manim_dur),
+                "SKETCH2MOTION_DELAY": str(manim_delay),
+                "SKETCH2MOTION_SCALE": str(manim_scale),
+                "SKETCH2MOTION_DRAW": manim_draw,
+            }
+        )
 
     filename = svg_p.stem
     cmd = [
+        sys.executable,
+        "-m",
         "manim",
         "-qh",  # fast rendering; consider -ql for even faster development quality
         "--disable_caching",
@@ -133,15 +168,20 @@ def convert_svg_to_mp4(
         "--output_file", filename,
         str(manim_scene_file),
         scene_class,
-        str(svg_p),
-        f"{manim_dur}",
-        f"{manim_delay}",
-        f"{manim_scale}",
-        f"{manim_draw}",
     ]
+    if not color_mode:
+        cmd.extend(
+            [
+                str(svg_p),
+                f"{manim_dur}",
+                f"{manim_delay}",
+                f"{manim_scale}",
+                f"{manim_draw}",
+            ]
+        )
 
     try:
-        _run(cmd)
+        _run(cmd, env=render_env)
 
         # Locate rendered video (Manim output layout may vary across versions)
         video_path = media_dir / "videos" / manim_scene_file.stem / "1080p60" / f"{filename}.mp4"
@@ -186,6 +226,20 @@ with gr.Blocks(title="Sketch to Motion") as demo:
                 label="Drawing style",
                 interactive=True
             )
+        with gr.Row():
+            color_mode = gr.Checkbox(
+                label="Preserve colors",
+                value=False,
+                interactive=True,
+            )
+            color_count = gr.Slider(
+                minimum=2,
+                maximum=16,
+                step=1,
+                value=8,
+                label="Color palette size",
+                interactive=True,
+            )
 
     with gr.Row():
         input_img = gr.Image(label="Input doodle/photo", type="filepath")
@@ -199,23 +253,44 @@ with gr.Blocks(title="Sketch to Motion") as demo:
 
 
     svg_path_state = gr.State(value="")
+    color_mode_state = gr.State(value=False)
 
-    # Contract: sketch2svg(image_path) -> (sketch_preview_path, svg_path)
+    def _generate_sketch(image_path, preserve_colors, colors):
+        if preserve_colors:
+            preview_path, svg_path = sketch2svg_color(image_path, num_colors=int(colors))
+        else:
+            preview_path, svg_path = sketch2svg(image_path)
+        return preview_path, svg_path, preserve_colors
+
     btn_sketch.click(
-        fn=sketch2svg,
-        inputs=input_img,
-        outputs=[sketch_preview, svg_path_state]
+        fn=_generate_sketch,
+        inputs=[input_img, color_mode, color_count],
+        outputs=[sketch_preview, svg_path_state, color_mode_state],
     )
 
-    def _guard_convert(svg_path, dur, delay, scale, drawtype):
+    def _guard_convert(svg_path, preserve_colors, dur, delay, scale, drawtype):
         """Guard against empty SVG path before conversion."""
         if not svg_path:
             return None
-        return convert_svg_to_mp4(svg_path, dur, delay, scale, drawtype)
+        return convert_svg_to_mp4(
+            svg_path,
+            dur,
+            delay,
+            scale,
+            drawtype,
+            preserve_colors,
+        )
 
     btn_video.click(
         fn=_guard_convert,
-        inputs=[svg_path_state, manim_dur, manim_delay, manim_scale, manim_drawtype],
+        inputs=[
+            svg_path_state,
+            color_mode_state,
+            manim_dur,
+            manim_delay,
+            manim_scale,
+            manim_drawtype,
+        ],
         outputs=video_preview
     )
 
