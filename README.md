@@ -2,6 +2,8 @@
 
 # Sketch to Motion
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 ## Colorful Version Demo
 
 | Input image | Colorful drawing animation |
@@ -36,7 +38,7 @@ It also prepends the last frame to the start of the video, creating a short paus
 - High-quality vector rendering powered by Manim
 - Optional color-preserving SVG and video generation
 - Automatic last-frame prepend for a smooth intro
-- Simple [Gradio](https://www.gradio.app/) web interface
+- Simple bilingual [Gradio](https://www.gradio.app/) web interface (English / Chinese)
 
 ---
 
@@ -46,7 +48,7 @@ It also prepends the last frame to the start of the video, creating a short paus
 ```bash
 git clone https://github.com/yourusername/sketch-to-motion.git
 cd Sketch2Motion
-````
+```
 
 ### 2. Install Python dependencies
 
@@ -96,8 +98,9 @@ http://127.0.0.1:7880
 
 ### 3. Web interface workflow
 
-1. Upload a doodle/photo as the **Input image**. Enable **Preserve colors** to use the color pipeline and choose its palette size.
-2. Click **Generate sketch** to convert it to SVG.
-3. Adjust **Animation duration**, **Subpath delay ratio**, **Scale factor**, and **Drawing style**.
-4. Choose the **Video format** (landscape is selected by default), then click **Generate video** to render and preview the animation.
-5. Download the generated MP4.
+1. Use the **Language / 语言** selector to switch between English and Chinese.
+2. Upload a doodle/photo as the **Input image**. Enable **Preserve colors** to use the color pipeline and choose its palette size.
+3. Click **Generate sketch** to convert it to SVG.
+4. Adjust **Animation duration**, **Subpath delay ratio**, **Scale factor**, and **Drawing style**.
+5. Choose the **Video format** (landscape is selected by default), then click **Generate video** to render and preview the animation.
+6. Download the generated MP4.

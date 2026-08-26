@@ -7,16 +7,29 @@ from pathlib import Path
 from typing import Optional
 
 import gradio as gr
+from locales import (
+    ENGLISH,
+    LANGUAGE_CHOICES,
+    drawing_style_choices,
+    get_ui_text,
+    normalize_drawing_style,
+    normalize_video_format,
+    video_format_choices,
+)
 from sketch2svg import sketch2svg  # must return (sketch_preview_path, svg_path)
 from sketch2svg_color import sketch2svg_color
 
 
 # ----- Video format options -----
-LANDSCAPE_FORMAT = "Landscape 16:9 (1920x1080)"
-PORTRAIT_FORMAT = "Portrait 9:16 (1080x1920)"
+LANDSCAPE_FORMAT = "landscape"
+PORTRAIT_FORMAT = "portrait"
 VIDEO_FORMATS = {
     LANDSCAPE_FORMAT: (1920, 1080),
     PORTRAIT_FORMAT: (1080, 1920),
+}
+LEGACY_VIDEO_FORMATS = {
+    "Landscape 16:9 (1920x1080)": LANDSCAPE_FORMAT,
+    "Portrait 9:16 (1080x1920)": PORTRAIT_FORMAT,
 }
 DEFAULT_VIDEO_FORMAT = LANDSCAPE_FORMAT
 
@@ -94,6 +107,8 @@ def _video_frame_rate(video_path: Path) -> Fraction:
 
 def _video_resolution(video_format: str) -> tuple[int, int]:
     """Resolve a UI format label to the width and height passed to Manim."""
+    video_format = normalize_video_format(video_format)
+    video_format = LEGACY_VIDEO_FORMATS.get(video_format, video_format)
     try:
         return VIDEO_FORMATS[video_format]
     except (KeyError, TypeError) as e:
@@ -255,32 +270,38 @@ def convert_svg_to_mp4(
 
 
 # ----- Gradio UI -----
-with gr.Blocks(title="Sketch to Motion") as demo:
-    gr.Markdown("## Doodle → Sketch → Video")
+with gr.Blocks(title="Sketch to Motion | 涂鸦转动画") as demo:
+    language_selector = gr.Dropdown(
+        choices=LANGUAGE_CHOICES,
+        value=ENGLISH,
+        label="Language / 语言",
+        interactive=True,
+    )
+    heading = gr.Markdown(get_ui_text(ENGLISH)["heading"])
 
-    with gr.Accordion("Parameters", open=True):
+    with gr.Accordion(get_ui_text(ENGLISH)["parameters"], open=True) as parameters:
         with gr.Row():
             manim_dur = gr.Slider(
                 minimum=0.5, maximum=20.0, step=0.5, value=10.0,
-                label="Animation duration (s)", interactive=True
+                label=get_ui_text(ENGLISH)["duration"], interactive=True
             )
             manim_delay = gr.Slider(
                 minimum=0.05, maximum=1.0, step=0.05, value=0.1,
-                label="Subpath delay ratio", interactive=True
+                label=get_ui_text(ENGLISH)["delay"], interactive=True
             )
             manim_scale = gr.Slider(
                 minimum=0.1, maximum=5.0, step=0.1, value=2.0,
-                label="scale factor", interactive=True
+                label=get_ui_text(ENGLISH)["scale"], interactive=True
             )
             manim_drawtype = gr.Dropdown(
-                choices=["linear", "smooth", "there_and_back", "wiggle"],
+                choices=drawing_style_choices(ENGLISH),
                 value="smooth",
-                label="Drawing style",
+                label=get_ui_text(ENGLISH)["drawing_style"],
                 interactive=True
             )
         with gr.Row():
             color_mode = gr.Checkbox(
-                label="Preserve colors",
+                label=get_ui_text(ENGLISH)["preserve_colors"],
                 value=False,
                 interactive=True,
             )
@@ -289,24 +310,24 @@ with gr.Blocks(title="Sketch to Motion") as demo:
                 maximum=16,
                 step=1,
                 value=8,
-                label="Color palette size",
+                label=get_ui_text(ENGLISH)["palette_size"],
                 interactive=True,
             )
             video_format = gr.Dropdown(
-                choices=list(VIDEO_FORMATS),
+                choices=video_format_choices(ENGLISH),
                 value=DEFAULT_VIDEO_FORMAT,
-                label="Video format",
+                label=get_ui_text(ENGLISH)["video_format"],
                 interactive=True,
             )
 
     with gr.Row():
-        input_img = gr.Image(label="Input doodle/photo", type="filepath")
-        sketch_preview = gr.Image(label="Sketch preview", type="filepath")
-        video_preview = gr.Video(label="Video preview", autoplay=True)
+        input_img = gr.Image(label=get_ui_text(ENGLISH)["input_image"], type="filepath")
+        sketch_preview = gr.Image(label=get_ui_text(ENGLISH)["sketch_preview"], type="filepath")
+        video_preview = gr.Video(label=get_ui_text(ENGLISH)["video_preview"], autoplay=True)
 
     with gr.Row():
-        btn_sketch = gr.Button("Generate sketch")
-        btn_video = gr.Button("Generate video")
+        btn_sketch = gr.Button(get_ui_text(ENGLISH)["generate_sketch"])
+        btn_video = gr.Button(get_ui_text(ENGLISH)["generate_video"])
         useless = gr.Button("(╯°□°）╯︵ ┻━┻")  # Just for fun, no functionality
 
 
@@ -343,9 +364,9 @@ with gr.Blocks(title="Sketch to Motion") as demo:
             dur,
             delay,
             scale,
-            drawtype,
+            normalize_drawing_style(drawtype),
             preserve_colors,
-            output_format,
+            normalize_video_format(output_format),
         )
 
     btn_video.click(
@@ -360,6 +381,55 @@ with gr.Blocks(title="Sketch to Motion") as demo:
             video_format,
         ],
         outputs=video_preview
+    )
+
+    def _update_interface(language: str, drawtype: str, output_format: str):
+        """Update labels and choices without changing the current workflow state."""
+        text = get_ui_text(language)
+        return (
+            gr.update(value=text["heading"]),
+            gr.update(label=text["parameters"]),
+            gr.update(label=text["duration"]),
+            gr.update(label=text["delay"]),
+            gr.update(label=text["scale"]),
+            gr.update(
+                choices=drawing_style_choices(language),
+                value=drawtype,
+                label=text["drawing_style"],
+            ),
+            gr.update(label=text["preserve_colors"]),
+            gr.update(label=text["palette_size"]),
+            gr.update(
+                choices=video_format_choices(language),
+                value=output_format,
+                label=text["video_format"],
+            ),
+            gr.update(label=text["input_image"]),
+            gr.update(label=text["sketch_preview"]),
+            gr.update(label=text["video_preview"]),
+            gr.update(value=text["generate_sketch"]),
+            gr.update(value=text["generate_video"]),
+        )
+
+    language_selector.change(
+        fn=_update_interface,
+        inputs=[language_selector, manim_drawtype, video_format],
+        outputs=[
+            heading,
+            parameters,
+            manim_dur,
+            manim_delay,
+            manim_scale,
+            manim_drawtype,
+            color_mode,
+            color_count,
+            video_format,
+            input_img,
+            sketch_preview,
+            video_preview,
+            btn_sketch,
+            btn_video,
+        ],
     )
 
 # Consider configuring the port via environment variable in production
