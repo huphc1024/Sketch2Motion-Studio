@@ -17,6 +17,7 @@ có timeline, lời thoại tiếng Việt bằng VieNeu Local và xuất video 
 - Lưu, mở lại dự án bằng JSON.
 - Tự động tải MP4 về máy ngay sau khi bấm Export và render hoàn tất.
 - Dọn cache hoặc các project cũ ngay trong giao diện.
+- Import nhiều ảnh theo thứ tự tên file và tự gán script từ `caption.srt`.
 
 ## 2. Yêu cầu hệ thống
 
@@ -198,6 +199,22 @@ Khi **Auto duration from voice** được bật, thời lượng scene sẽ tự
 - **Delete** hoặc dấu `×`: xóa scene.
 - Kéo thả card trên timeline để đổi thứ tự.
 - Chọn **Transition** và thời lượng chuyển cảnh cho từng scene.
+
+### Import nhiều ảnh và script SRT
+
+1. Mở **Import Images & SRT Scripts** ở cột bên trái.
+2. Chọn nhiều ảnh cùng lúc. App sắp xếp tự nhiên theo tên file, ví dụ
+   `image1.png`, `image2.png`, `image10.png`.
+3. Chọn file `caption.srt` nếu có. Nội dung caption thứ nhất được gán vào scene
+   thứ nhất, caption thứ hai vào scene thứ hai và tiếp tục theo thứ tự.
+4. Bấm **Import scenes**. Timeline hiện tại được thay bằng các scene vừa nhập.
+5. Kiểm tra script rồi bấm **Generate All Voices**.
+
+Timestamp trong SRT không ép thời lượng video. Sau khi voice được tạo, tính năng
+**Auto duration from voice** tự đặt thời lượng từng scene theo đúng độ dài audio.
+Nếu số ảnh nhiều hơn caption, các scene còn lại có script trống. Nếu caption
+nhiều hơn ảnh, phần caption dư được nối vào script của scene cuối để không mất
+nội dung.
 
 ### Xem trước và xuất video
 

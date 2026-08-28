@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from components.timeline import render_timeline
 from models.project import Scene, migrate_project, new_project
+from services.media_import import import_images_and_scripts
 from services.project_io import load_project, save_project
 from services.rendering import compose_scene_video, ensure_scene_svg, export_project
 from services.storage import clear_old_cache, delete_old_projects, format_storage_summary
@@ -289,6 +290,27 @@ def _new_project():
     return _full_refresh(project, project["scenes"][0]["id"])
 
 
+def _import_media(project, selected_scene_id, images, caption_file):
+    try:
+        result = import_images_and_scripts(project, images, caption_file)
+        caption_note = f"{result.caption_count} SRT scripts assigned" if result.caption_count else "no SRT scripts"
+        overflow_note = (
+            f" Extra {result.overflow_count} captions were appended to the final scene."
+            if result.overflow_count else ""
+        )
+        empty_note = (
+            f" {result.image_count - result.caption_count} scenes have an empty script."
+            if result.image_count > result.caption_count and result.caption_count else ""
+        )
+        message = (
+            f"✓ Imported {result.image_count} scenes in file-name order · {caption_note}."
+            f"{overflow_note}{empty_note} Generate All Voices to set every scene duration from its audio."
+        )
+        return (*_full_refresh(result.project, result.selected_scene_id), message)
+    except Exception as error:
+        return (*_full_refresh(project, selected_scene_id), f"⚠ Import failed: {error}")
+
+
 def _update_voice_settings(project, selected_scene_id, language, provider, voice_id, speed, pitch, volume, auto_duration):
     notice = "VieNeu Local v3 Turbo · 20 built-in Vietnamese voices."
     if language == "none":
@@ -506,6 +528,17 @@ def build_demo() -> gr.Blocks:
                     aspect_ratio = gr.Dropdown(["9:16", "16:9", "1:1"], value="16:9", label="Aspect ratio")
                     fps = gr.Dropdown([30, 60], value=30, label="FPS")
                     resolution = gr.Dropdown(["720p", "1080p"], value="1080p", label="Resolution")
+                    with gr.Accordion("Import Images & SRT Scripts", open=False):
+                        bulk_images = gr.File(
+                            label="Images (sorted naturally by file name)", type="filepath",
+                            file_count="multiple", file_types=["image"],
+                        )
+                        caption_file = gr.File(label="Scripts from caption.srt (optional)", type="filepath", file_types=[".srt"])
+                        import_media_btn = gr.Button("Import scenes", variant="primary", elem_classes="primary")
+                        import_status = gr.Markdown(
+                            "Replaces the timeline. Image 1 receives SRT script 1, image 2 receives script 2, and so on.",
+                            elem_classes="compact-status",
+                        )
                     load_file = gr.File(label="Load project JSON", type="filepath", file_types=[".json"])
                     saved_file = gr.File(label="Saved project", interactive=False)
                     with gr.Accordion("Storage & Cleanup", open=False):
@@ -577,6 +610,11 @@ def build_demo() -> gr.Blocks:
         duplicate_scene_btn.click(lambda p, s: _button_action("duplicate", p, s), [project_state, selected_scene_state], refresh_outputs)
         delete_scene_btn.click(lambda p, s: _button_action("delete", p, s), [project_state, selected_scene_state], refresh_outputs)
         new_project_btn.click(_new_project, outputs=refresh_outputs)
+        import_media_btn.click(
+            _import_media,
+            [project_state, selected_scene_state, bulk_images, caption_file],
+            [*refresh_outputs, import_status],
+        )
 
         scene_inputs = [project_state, selected_scene_state, scene_name, image, image_prompt, preserve_colors, color_count, script, duration, scene_auto_duration, animation, delay, scale, transition_type, transition_duration]
         scene_outputs = [project_state, timeline_html, script_stats, voice_status]
