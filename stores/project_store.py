@@ -110,6 +110,22 @@ class ProjectStore:
         return model.to_dict()
 
     @staticmethod
+    def update_all_scene_visuals(
+        project: dict[str, Any], *, preserve_colors: bool, color_count: int, animation_scale: float,
+    ) -> dict[str, Any]:
+        model = migrate_project(project)
+        palette = max(2, min(16, int(color_count)))
+        scale = max(0.1, float(animation_scale))
+        for scene in model.scenes:
+            if scene.preserve_colors != bool(preserve_colors) or scene.color_count != palette:
+                scene.svg_path = None
+            scene.preserve_colors = bool(preserve_colors)
+            scene.color_count = palette
+            scene.animation_scale = scale
+            scene.preview_url = None
+        return model.to_dict()
+
+    @staticmethod
     def _renumber_default_names(scenes: list[Scene]) -> None:
         for index, scene in enumerate(scenes):
             if scene.name.startswith("Scene ") and not scene.name.endswith(" copy"):

@@ -333,6 +333,21 @@ def _update_video_settings(project, aspect_ratio, fps, resolution):
     return ProjectStore.update_project(project, video={"aspect_ratio": aspect_ratio, "fps": fps, "resolution": resolution})
 
 
+def _apply_visuals_to_all(project, selected_scene_id, preserve_colors, color_count, scale):
+    project = ProjectStore.update_all_scene_visuals(
+        project,
+        preserve_colors=preserve_colors,
+        color_count=color_count,
+        animation_scale=scale,
+    )
+    total = len(migrate_project(project).scenes)
+    return (
+        project,
+        render_timeline(project, selected_scene_id),
+        f"✓ Applied Preserve colors, Palette {int(color_count)} and Scale {float(scale):.1f} to all {total} scenes.",
+    )
+
+
 def _refresh_voices(project):
     settings = migrate_project(project).voice_settings
     if settings.provider == "none" or settings.language != "vi":
@@ -582,6 +597,8 @@ def build_demo() -> gr.Blocks:
                         animation = gr.Dropdown([("Linear", "linear"), ("Smooth", "smooth"), ("There and back", "there_and_back"), ("Wiggle", "wiggle")], value="smooth", label="Preset")
                         delay = gr.Slider(0.0, 1.0, value=0.1, step=0.05, label="Subpath delay")
                         scale = gr.Slider(0.1, 5.0, value=2.0, step=0.1, label="Scale")
+                        apply_visuals_btn = gr.Button("Apply Preserve colors, Palette & Scale to all scenes")
+                        bulk_visual_status = gr.Markdown("Uses the current scene values.", elem_classes="compact-status")
                     with gr.Accordion("Duration & Transition", open=True):
                         duration = gr.Number(value=5.0, minimum=0.5, label="Scene duration (seconds)")
                         scene_auto_duration = gr.Checkbox(value=True, label="Auto from voice")
@@ -620,6 +637,11 @@ def build_demo() -> gr.Blocks:
         scene_outputs = [project_state, timeline_html, script_stats, voice_status]
         for component in [scene_name, image, image_prompt, preserve_colors, color_count, script, duration, scene_auto_duration, animation, delay, scale, transition_type, transition_duration]:
             component.change(_sync_scene, scene_inputs, scene_outputs)
+        apply_visuals_btn.click(
+            _apply_visuals_to_all,
+            [project_state, selected_scene_state, preserve_colors, color_count, scale],
+            [project_state, timeline_html, bulk_visual_status],
+        )
 
         project_title.change(_update_title, [project_state, project_title], project_state)
         voice_inputs = [project_state, selected_scene_state, language, provider, voice, speed, pitch, volume, global_auto_duration]

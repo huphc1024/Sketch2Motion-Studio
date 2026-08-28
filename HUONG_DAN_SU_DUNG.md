@@ -199,6 +199,9 @@ Khi **Auto duration from voice** được bật, thời lượng scene sẽ tự
 - **Delete** hoặc dấu `×`: xóa scene.
 - Kéo thả card trên timeline để đổi thứ tự.
 - Chọn **Transition** và thời lượng chuyển cảnh cho từng scene.
+- Để đồng bộ hình ảnh, chỉnh **Preserve colors**, **Palette** và **Scale** trên
+  scene hiện tại, sau đó bấm **Apply Preserve colors, Palette & Scale to all
+  scenes**. SVG và preview cũ sẽ được tạo lại với thiết lập mới khi render.
 
 ### Import nhiều ảnh và script SRT
 

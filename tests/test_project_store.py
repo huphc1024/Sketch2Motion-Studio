@@ -44,6 +44,29 @@ class ProjectStoreTests(unittest.TestCase):
         scene.apply_audio("voice.wav", 3.2, "hash")
         self.assertAlmostEqual(scene.duration, 3.6)
 
+    def test_visual_settings_can_be_applied_to_every_scene(self):
+        project = new_project().to_dict()
+        first_id = project["scenes"][0]["id"]
+        project, _ = ProjectStore.add_scene(project, first_id)
+        for scene in project["scenes"]:
+            scene["svg_path"] = "cached.svg"
+            scene["preview_url"] = "cached.mp4"
+            scene["script"] = "Keep this narration"
+            scene["audio_url"] = "voice.wav"
+
+        project = ProjectStore.update_all_scene_visuals(
+            project, preserve_colors=True, color_count=12, animation_scale=3.4,
+        )
+
+        for scene in migrate_project(project).scenes:
+            self.assertTrue(scene.preserve_colors)
+            self.assertEqual(scene.color_count, 12)
+            self.assertEqual(scene.animation_scale, 3.4)
+            self.assertIsNone(scene.svg_path)
+            self.assertIsNone(scene.preview_url)
+            self.assertEqual(scene.script, "Keep this narration")
+            self.assertEqual(scene.audio_url, "voice.wav")
+
     def test_project_supports_ten_scenes(self):
         project = new_project().to_dict()
         selected = project["scenes"][0]["id"]
