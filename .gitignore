@@ -138,6 +138,7 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.venv-vieneu/
 env/
 venv/
 ENV/
@@ -206,6 +207,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 media
+generated/
+.env
 *.svg
 *.png 
 *.jpg

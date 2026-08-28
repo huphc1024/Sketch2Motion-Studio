@@ -28,6 +28,13 @@ It also prepends the last frame to the start of the video, creating a short paus
 
 ## Features
 
+- **Multi-scene project editor** with a draggable scene timeline
+- Per-scene images, scripts, animation settings, voice status, and duration
+- Provider-neutral TTS backend with VieNeu as the first Vietnamese provider
+- SHA-256 TTS cache and sequential batch generation (`concurrency = 1`)
+- Scene and full-project synchronized preview
+- Project JSON save/load with migration from the original single-image shape
+- H.264/AAC master export in 9:16, 16:9, or 1:1 at 720p/1080p and 30/60 FPS
 - **Image → Sketch → SVG → Animated MP4**
 - Adjustable animation parameters:
   - **Animation duration** (seconds)
@@ -93,8 +100,51 @@ python app.py
 Access the app at:
 
 ```
-http://127.0.0.1:7880
+http://127.0.0.1:7880/studio/
 ```
+
+The editor still supports the original one-image workflow: a new project starts
+with one scene, so you can upload an image, generate its sketch, and preview it
+without adding more scenes.
+
+### VieNeu TTS bridge
+
+Sketch2Motion does not load VieNeu in the Gradio process. Configure a local
+VieNeu audio bridge in `.env` (see `.env.example`):
+
+```env
+VIENEU_TTS_URL=http://127.0.0.1:8001
+VIENEU_TTS_VOICES_PATH=/voices
+VIENEU_TTS_SYNTHESIZE_PATH=/synthesize
+```
+
+The bridge should return WAV/MP3 bytes, or JSON containing `audioUrl` or base64
+audio. Sketch2Motion exposes its own backend endpoints:
+
+```text
+GET  /api/tts/voices
+POST /api/tts/generate
+```
+
+VieNeu is registered for Vietnamese only. English remains an explicit provider
+extension point; **No Voice** mode uses manual scene durations.
+
+An SDK-backed bridge is included. Keep it in a separate environment so the
+VieNeu model cannot consume the editor's memory:
+
+```powershell
+py -3.12 -m venv .venv-vieneu
+.venv-vieneu/Scripts/python -m pip install -r requirements-vieneu.txt
+.venv-vieneu/Scripts/python -m services.tts.vieneu_bridge
+```
+
+The local bridge defaults to VieNeu v3 Turbo and exposes all 20 built-in voices
+across Northern, Central, and Southern accents. CPU uses the ONNX/int8 path by
+default; set `VIENEU_DEVICE=cuda` to let VieNeu use its GPU path. The bridge also
+supports legacy modes and the official remote mode through
+`VIENEU_MODE=remote` and `VIENEU_REMOTE_API_BASE`. Voice enumeration remains
+dynamic, so custom presets returned by a configured SDK/model also appear in
+the editor after clicking **Refresh voices**.
 
 ### 3. Web interface workflow
 

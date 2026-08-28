@@ -1,15 +1,30 @@
 import os
-
-from manim import LaggedStart, SVGMobject, FullScreenRectangle
-from manim import Scene, config, WHITE, BLACK, ORIGIN
-from manim import linear, smooth, there_and_back, wiggle
 import sys
 
-svg_file = sys.argv[-5] if sys.argv[-5].endswith(".svg") else "sketch.svg"
-duration = float(sys.argv[-4]) if sys.argv[-4].replace('.', '', 1).isdigit() else 10.0
-delay = float(sys.argv[-3]) if sys.argv[-3].replace('.', '', 1).isdigit() else 0.1
-scale = float(sys.argv[-2]) if sys.argv[-2].replace('.', '', 1).isdigit() else 2.0
-draw_type = sys.argv[-1] if sys.argv[-1] in ["linear", "smooth", "there_and_back", "wiggle"] else "smooth"
+from manim import BLACK, ORIGIN, WHITE, FullScreenRectangle, LaggedStart, SVGMobject
+from manim import Scene, config, linear, smooth, there_and_back, wiggle
+
+
+def _float_arg(value: str | None, default: float) -> float:
+    try:
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _scene_arguments() -> tuple[str, float, float, float, str, float]:
+    args = sys.argv[1:]
+    legacy = args[-5:] if len(args) >= 5 and args[-5].lower().endswith(".svg") else []
+    svg_path = os.getenv("SKETCH2MOTION_SVG") or (legacy[0] if legacy else "sketch.svg")
+    duration = _float_arg(os.getenv("SKETCH2MOTION_DURATION") or (legacy[1] if legacy else None), 10.0)
+    delay = _float_arg(os.getenv("SKETCH2MOTION_DELAY") or (legacy[2] if legacy else None), 0.1)
+    scale = _float_arg(os.getenv("SKETCH2MOTION_SCALE") or (legacy[3] if legacy else None), 2.0)
+    draw = os.getenv("SKETCH2MOTION_DRAW") or (legacy[4] if legacy else "smooth")
+    hold = max(0.0, _float_arg(os.getenv("SKETCH2MOTION_HOLD"), 0.5))
+    return svg_path, max(0.05, duration), max(0.0, delay), max(0.1, scale), draw, hold
+
+
+svg_file, duration, delay, scale, draw_type, hold_duration = _scene_arguments()
 
 # Define the drawing functions
 draw_dict = {
@@ -65,7 +80,8 @@ class DrawSVG(Scene):
                 rate_func= draw_dict.get(draw_type, smooth)
             )
         )
-        self.wait(1)
+        if hold_duration:
+            self.wait(hold_duration)
 
 # manim -pql svg2mp4.py DrawSVG
 

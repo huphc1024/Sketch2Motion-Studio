@@ -18,7 +18,7 @@ def _float_arg(value: str, default: float) -> float:
         return default
 
 
-def _scene_arguments() -> tuple[str, float, float, float, str]:
+def _scene_arguments() -> tuple[str, float, float, float, str, float]:
     args = sys.argv[1:]
     legacy_args = args[-5:] if len(args) >= 5 and args[-5].endswith(".svg") else []
     svg_path = os.environ.get("SKETCH2MOTION_SVG") or (
@@ -39,7 +39,8 @@ def _scene_arguments() -> tuple[str, float, float, float, str]:
     draw_type = os.environ.get("SKETCH2MOTION_DRAW") or (
         legacy_args[4] if legacy_args else "smooth"
     )
-    return svg_path, duration, delay, scale, draw_type
+    hold = max(0.0, _float_arg(os.environ.get("SKETCH2MOTION_HOLD"), 0.5))
+    return svg_path, duration, delay, scale, draw_type, hold
 
 
 def _background_color(svg_path: str) -> str:
@@ -71,7 +72,7 @@ def _foreground_svg(svg_path: str) -> tuple[str, Optional[Path]]:
         return file.name, Path(file.name)
 
 
-svg_file, duration, delay, scale, draw_type = _scene_arguments()
+svg_file, duration, delay, scale, draw_type, hold_duration = _scene_arguments()
 draw_dict = {
     "linear": linear,
     "smooth": smooth,
@@ -131,4 +132,5 @@ class DrawSVGColor(Scene):
                     rate_func=draw_dict.get(draw_type, smooth),
                 )
             )
-        self.wait(0.5)
+        if hold_duration:
+            self.wait(hold_duration)

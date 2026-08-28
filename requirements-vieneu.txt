@@ -1,0 +1,7 @@
+# Install this in a separate environment used only by the VieNeu bridge.
+# On Windows, use Python 3.12 or 3.13 so native dependency wheels are available.
+# Windows CPU wheels for llama-cpp-python are provided by the VieNeu project.
+--extra-index-url https://pnnbao97.github.io/llama-cpp-python-v0.3.16/cpu/
+vieneu>=3.3.0,<4
+fastapi==0.141.1
+uvicorn==0.52.4
