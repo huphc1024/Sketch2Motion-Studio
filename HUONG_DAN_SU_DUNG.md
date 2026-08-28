@@ -15,6 +15,8 @@ có timeline, lời thoại tiếng Việt bằng VieNeu Local và xuất video 
 - Hỗ trợ 720p/1080p và 30/60 FPS.
 - Giao diện Light/Dark và ghi nhớ theme đã chọn.
 - Lưu, mở lại dự án bằng JSON.
+- Tự động tải MP4 về máy ngay sau khi bấm Export và render hoàn tất.
+- Dọn cache hoặc các project cũ ngay trong giao diện.
 
 ## 2. Yêu cầu hệ thống
 
@@ -203,7 +205,8 @@ Khi **Auto duration from voice** được bật, thời lượng scene sẽ tự
 2. Mở tab **Full project** để kiểm tra toàn bộ timeline.
 3. Chọn tỉ lệ khung hình, FPS và độ phân giải ở **Video Settings**.
 4. Bấm **Export MP4**.
-5. Tải file MP4 sau khi quá trình render hoàn tất.
+5. Sau khi render hoàn tất, trình duyệt tự tải file MP4 về máy. Nếu trình duyệt
+   chặn tải tự động, bấm file trong mục **Exported MP4** để tải thủ công.
 
 Video và audio sinh ra được lưu trong thư mục `generated/`. Thư mục này đã được
 Git ignore.
@@ -221,13 +224,27 @@ Bấm **🌙 Dark** ở thanh tiêu đề để chuyển sang giao diện tối.
 **☀ Light** để quay lại giao diện sáng. Lựa chọn được lưu trong trình duyệt và
 được giữ nguyên khi tải lại trang.
 
-## 10. Chạy kiểm thử
+## 10. Dọn cache và project cũ
+
+Mở mục **Storage & Cleanup** ở cột bên trái:
+
+- **Refresh storage**: cập nhật dung lượng cache và số project cũ.
+- **Clear old cache**: xóa audio không còn được project hiện tại sử dụng cùng
+  render/export của các project khác. Cache và audio đang dùng của project hiện
+  tại được giữ lại.
+- **Delete old projects**: xóa dữ liệu project, render và export của tất cả
+  project khác; project đang mở được giữ lại.
+
+Trước khi xóa, phải bật **Confirm deletion of old local data**. Dữ liệu đã xóa
+không thể khôi phục từ giao diện, vì vậy hãy tải file JSON cần giữ lại trước.
+
+## 11. Chạy kiểm thử
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -q
 ```
 
-## 11. Xử lý lỗi thường gặp
+## 12. Xử lý lỗi thường gặp
 
 ### Không thấy đủ voice
 
@@ -277,6 +294,6 @@ $env:VIENEU_TTS_URL = "http://127.0.0.1:8002"
 - Chỉ chạy một VieNeu bridge.
 - Không tăng concurrency tạo voice lên quá 1.
 
-## 12. Dừng ứng dụng
+## 13. Dừng ứng dụng
 
 Tại mỗi terminal đang chạy server, nhấn `Ctrl+C`.

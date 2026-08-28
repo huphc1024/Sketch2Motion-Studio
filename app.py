@@ -20,6 +20,7 @@ from components.timeline import render_timeline
 from models.project import Scene, migrate_project, new_project
 from services.project_io import load_project, save_project
 from services.rendering import compose_scene_video, ensure_scene_svg, export_project
+from services.storage import clear_old_cache, delete_old_projects, format_storage_summary
 from services.timeline import timeline_markdown
 from services.tts import SynthesisInput, default_tts_service
 from services.tts.vieneu_voices import v3_turbo_voices
@@ -162,6 +163,22 @@ TIMELINE_JS = r"""
   };
   const initialize = () => { bindTheme(); bind(); };
   initialize(); new MutationObserver(initialize).observe(document.body, {childList: true, subtree: true});
+}
+"""
+
+DOWNLOAD_JS = r"""
+(file) => {
+  const value = Array.isArray(file) ? file[0] : file;
+  const url = typeof value === 'string' ? value : value?.url;
+  if (!url) return [];
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = value?.orig_name || 'sketch2motion-export.mp4';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  window.setTimeout(() => link.remove(), 1000);
+  return [];
 }
 """
 
@@ -399,6 +416,37 @@ def _preview_project(project):
         return None, f"⚠ {error}"
 
 
+def _export_and_download(project):
+    try:
+        video = export_project(project, quality="l")
+        return video, video, f"✓ Export complete. Download started automatically.\n\n{timeline_markdown(project)}"
+    except Exception as error:
+        return None, None, f"⚠ {error}"
+
+
+def _storage_status(project):
+    return format_storage_summary(project)
+
+
+def _cleanup_storage(project, confirmed, action):
+    if not confirmed:
+        return gr.update(value=False), "⚠ Tick the confirmation box before deleting local data.\n\n" + format_storage_summary(project)
+    try:
+        if action == "cache":
+            result = clear_old_cache(project)
+            label = "old cache"
+        elif action == "projects":
+            result = delete_old_projects(project)
+            label = "old projects"
+        else:
+            raise ValueError("Unknown cleanup action.")
+        megabytes = result.bytes / (1024 * 1024)
+        message = f"✓ Deleted {result.files} files from {label} · freed {megabytes:.1f} MB.\n\n{format_storage_summary(project)}"
+        return gr.update(value=False), message
+    except Exception as error:
+        return gr.update(value=False), f"⚠ Cleanup failed: {error}\n\n{format_storage_summary(project)}"
+
+
 def _save_project(project):
     try:
         path = save_project(project)
@@ -460,6 +508,13 @@ def build_demo() -> gr.Blocks:
                     resolution = gr.Dropdown(["720p", "1080p"], value="1080p", label="Resolution")
                     load_file = gr.File(label="Load project JSON", type="filepath", file_types=[".json"])
                     saved_file = gr.File(label="Saved project", interactive=False)
+                    with gr.Accordion("Storage & Cleanup", open=False):
+                        storage_status = gr.Markdown(format_storage_summary(initial_project), elem_classes="compact-status")
+                        cleanup_confirm = gr.Checkbox(label="Confirm deletion of old local data", value=False)
+                        with gr.Row():
+                            refresh_storage_btn = gr.Button("Refresh storage", size="sm")
+                            clear_cache_btn = gr.Button("Clear old cache", size="sm")
+                        delete_projects_btn = gr.Button("Delete old projects", size="sm", variant="stop")
 
                 with gr.Column(scale=5, min_width=500, elem_classes=["panel", "canvas-panel"]):
                     gr.Markdown("<span class='section-kicker'>Canvas / Preview</span>")
@@ -474,6 +529,7 @@ def build_demo() -> gr.Blocks:
                         with gr.Tab("Full project"):
                             full_video = gr.Video(label="Master timeline preview", autoplay=False, height=430)
                             preview_project_btn = gr.Button("Preview full project", variant="primary", elem_classes="primary")
+                            export_file = gr.File(label="Exported MP4", interactive=False)
                     render_status = gr.Markdown("Select a scene to begin.", elem_classes="compact-status")
 
                 with gr.Column(scale=3, min_width=310, elem_classes="panel"):
@@ -544,9 +600,19 @@ def build_demo() -> gr.Blocks:
         generate_all_btn.click(_generate_all_voices, [project_state, selected_scene_state], [project_state, timeline_html, batch_status, scene_audio, voice_status, duration])
         preview_scene_btn.click(_preview_scene, [project_state, selected_scene_state], [project_state, timeline_html, scene_video, render_status])
         preview_project_btn.click(_preview_project, project_state, [full_video, render_status])
-        export_btn.click(_preview_project, project_state, [full_video, render_status])
+        export_event = export_btn.click(_export_and_download, project_state, [full_video, export_file, render_status])
+        export_event.then(fn=None, inputs=export_file, outputs=None, js=DOWNLOAD_JS)
         save_btn.click(_save_project, project_state, [saved_file, render_status])
         load_file.upload(_load_project, load_file, [*refresh_outputs, render_status])
+        refresh_storage_btn.click(_storage_status, project_state, storage_status)
+        clear_cache_btn.click(
+            lambda project, confirmed: _cleanup_storage(project, confirmed, "cache"),
+            [project_state, cleanup_confirm], [cleanup_confirm, storage_status],
+        )
+        delete_projects_btn.click(
+            lambda project, confirmed: _cleanup_storage(project, confirmed, "projects"),
+            [project_state, cleanup_confirm], [cleanup_confirm, storage_status],
+        )
     return demo
 
 
