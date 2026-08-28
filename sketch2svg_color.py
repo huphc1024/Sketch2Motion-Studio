@@ -7,8 +7,8 @@ from xml.etree import ElementTree as ET
 
 from PIL import Image
 
+from services.tooling import resolve_potrace
 
-POTRACE = "potrace.exe" if sys.platform == "win32" else "potrace"
 SVG_NS = "http://www.w3.org/2000/svg"
 BACKGROUND_LAYER_ID = "sketch2motion-background"
 
@@ -17,7 +17,7 @@ def _trace_mask(mask: Image.Image) -> bytes:
     buffer = io.BytesIO()
     mask.save(buffer, format="BMP")
     result = subprocess.run(
-        [POTRACE, "-s", "--group", "-o", "-"],
+        [resolve_potrace(), "-s", "--group", "-o", "-"],
         input=buffer.getvalue(),
         stdout=subprocess.PIPE,
         check=True,

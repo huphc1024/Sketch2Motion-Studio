@@ -208,6 +208,7 @@ marimo/_lsp/
 __marimo__/
 media
 generated/
+tools/potrace/
 .env
 *.svg
 *.png 

@@ -37,6 +37,14 @@ ffmpeg -version
 potrace --version
 ```
 
+Trên Windows, có thể cài Potrace cục bộ cho riêng project bằng lệnh:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_potrace.ps1
+```
+
+App tự nhận binary tại `tools\potrace\potrace.exe`, vì vậy không cần sửa `PATH`.
+
 ## 3. Clone source code
 
 ```powershell
@@ -246,7 +254,11 @@ py -3.12 -m venv --clear .venv-vieneu
 ### Lỗi `ffmpeg` hoặc `potrace` không tồn tại
 
 Cài công cụ tương ứng và thêm thư mục chứa file thực thi vào biến `PATH`, sau
-đó mở cửa sổ PowerShell mới.
+đó mở cửa sổ PowerShell mới. Riêng Windows, cách nhanh nhất để sửa Potrace là:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_potrace.ps1
+```
 
 ### Cổng 7880 hoặc 8001 đã được sử dụng
 

@@ -1,14 +1,10 @@
 import io
-import  sys
+import sys
 import subprocess
 from PIL import Image
 from svgpathtools import parse_path,Path
 from xml.etree import ElementTree as ET
-
-if sys.platform == "win32":
-    executable_path = "potrace.exe"
-else:
-    executable_path = "potrace"
+from services.tooling import resolve_potrace
 
 def sketch2svg(
     img_path: str,
@@ -24,7 +20,7 @@ def sketch2svg(
     pbm_data = buf.getvalue()
     
     proc = subprocess.run(
-            [f"{executable_path}", "-s", "--group", "-o", "-"],
+            [resolve_potrace(), "-s", "--group", "-o", "-"],
             input=pbm_data,
             stdout=subprocess.PIPE,
             check=True
